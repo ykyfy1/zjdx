@@ -1,4 +1,4 @@
-slq888.cn:9999,0
-www.www.www.www.www.www.www.kod.nlmxy.cn:4000
-www.www.www.www.www.www.www.www.www.www.kod.nlmxy.cn:4000
-www.nlmxy.cn:4000
+183.151,158:4022,0
+60.186:4022,0
+125.107,119,121,123,125:4022|9999|8088|8888,0
+www.nlmxy.cn:4000,0
