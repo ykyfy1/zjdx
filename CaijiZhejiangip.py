@@ -18,7 +18,7 @@ GEO_SEMAPHORE = 8
 GEO_ENABLE = True
 PRINT_STEP_PCT = 2
 QUEUE_SIZE = SEMAPHORE_NUM * 2
-MAX_TOTAL_FIND = 1000
+MAX_TOTAL_FIND = 5000
 # ======================================================
 geo_cache = {}
 
