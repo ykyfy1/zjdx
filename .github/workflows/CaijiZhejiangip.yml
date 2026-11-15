@@ -3,7 +3,7 @@ permissions:
   contents: write
 on:
   schedule:
-    - cron: "05 16 * * *"
+    - cron: "01 19 * * *"
   workflow_dispatch:
 jobs:
   run-script:
@@ -36,13 +36,24 @@ jobs:
         run: |
           mkdir -p txt logs ip template
 
-      # ==========【新增：扫描前清空ip目录旧good_*文件，防止残留干扰测速】==========
+      # ==========【修复：生成到ip文件夹，python脚本才能读到】==========
+      - name: 临时生成上海电信IP段配置文件(来自Secret，不存入仓库)
+        env:
+          SHDX_IP_CONTENT: ${{ secrets.ZJDX_IP_CONFIG }}
+        run: |
+          printf "%s" "$ZJDX_IP_CONTENT" > ip/Zhejiang_dianxin_ip_config.txt
+          echo "====调试1：检查文件是否存在===="
+          ls -la ip/Zhejiang_dianxin_ip_config.txt
+          echo "====调试2：统计文件行数===="
+          wc -l ip/Zhejiang_dianxin_ip_config.txt
+
+      # ==========【清理ip目录旧good_*文件，防止残留干扰测速】==========
       - name: 清理ip目录历史good_*旧文件
         run: |
           rm -f ip/good_*.txt
           rm -f ip/组播_*.txt
           echo "✅ 已清理 ip/ 目录下旧的 good_*.txt 与 组播_*.txt"
-      # =====================================================================
+
 
       # 清理7天前旧日志
       - name: 清理7天前旧日志
@@ -56,12 +67,12 @@ jobs:
           find txt -type f -name "*.txt" -mtime +7 -delete
           echo "✅ 已删除txt目录下7天前的txt结果文件"
 
-      # =========【修复顺序：先备份旧文件，再跑脚本】=========
+      # =========【运行采集测速脚本】=========
       - name: 获取源 + 多城市测速处理
         run: |
           export ZUBO_PASSWORD="${ZUBO_PASSWORD}"
           cd $GITHUB_WORKSPACE
-          # =====【第一步：先备份仓库原始zubo.txt】=====
+          # =====【第一步：备份旧zubo.txt】=====
           if [ -f "zubo.txt" ] && [ -s "zubo.txt" ]; then
             cp zubo.txt zubo_bf.txt
             echo "✅ 已备份运行前zubo.txt为zubo_bf.txt"
@@ -75,13 +86,13 @@ jobs:
           python ./CaijiZhejiangip.py
           bash ./CaijiZhejiangip.sh 0
 
-          # =========【原样拼接城市原文，无额外标题】=========
+          # =========【拼接城市源到zubo.txt】=========
           echo "===按定义顺序拼接城市文件到zubo.txt==="
           > zubo.txt
-          # 在这里自定义城市顺序，新增城市直接追加一行
+          # 自定义城市顺序，新增城市直接追加一行
           city_list=(
             "txt/Zhejiang_dianxin.txt"
-            #"txt/Shanghai_dianxin.txt"
+            #"txt/Beijing_dianxin.txt"
             #"txt/Guangzhou_dianxin.txt"
           )
 
@@ -98,7 +109,6 @@ jobs:
           if [ ! -s zubo.txt ]; then
             echo "# 暂无测速IP数据" > zubo.txt
           fi
-          # ==================================================
 
           NEW_ZUBO="./zubo.txt"
           
@@ -120,7 +130,7 @@ jobs:
           wc -l txt/*.txt
           wc -l zubo.txt
 
-          # ==========【关键：复制一份明文 zubo.m3u 用于CF部署，保留不动！】==========
+          # ==========【复制明文 zubo.m3u 用于CF部署】==========
           cp zubo.txt zubo.m3u
           echo "✅ 已生成 zubo.m3u 用于Cloudflare Pages部署"
           # 兜底页面，保证部署目录有静态文件
@@ -129,36 +139,89 @@ jobs:
         env:
           ZUBO_PASSWORD: ${{ secrets.ZUBO_PASSWORD }}
 
-      # ====================== ✅【Cloudflare Pages部署 wrangler-action@v4 官方新版】 ======================
+      # ====================== 打包dist目录，新版鉴权中间件 ======================
+      - name: 打包dist并生成CF鉴权中间件
+        run: |
+          rm -rf dist
+          mkdir -p dist
+          mkdir -p dist/functions
+          cp zubo.m3u dist/
+          cp index.html dist/
+          cp -r ip dist/
+          cp -r logs dist/
+          # 把根目录的good_xxx.txt也复制进dist根目录
+          cp good_*.txt dist/ 2>/dev/null || true
+
+          # 生成ip目录浏览页面
+          echo '<!DOCTYPE html><html><head><meta charset="utf-8"><title>IP文件列表</title></head><body><h3>IP文件列表</h3><ul>' > dist/ip/index.html
+          for f in dist/ip/*; do
+            if [ -f "$f" ];then
+              fn=$(basename "$f")
+              echo "<li><a href=\"${fn}\">${fn}</a></li>" >> dist/ip/index.html
+            fi
+          done
+          echo '</ul></body></html>' >> dist/ip/index.html
+
+          # 生成logs目录浏览页面
+          echo '<!DOCTYPE html><html><head><meta charset="utf-8"><title>日志文件列表</title></head><body><h3>Logs日志列表</h3><ul>' > dist/logs/index.html
+          for f in dist/logs/*; do
+            if [ -f "$f" ];then
+              fn=$(basename "$f")
+              echo "<li><a href=\"${fn}\">${fn}</a></li>" >> dist/logs/index.html
+            fi
+          done
+          echo '</ul></body></html>' >> dist/logs/index.html
+
+          # 新版中间件：只有zubo.m3u使用BASIC，其他全部RAW账号
+          echo "export async function onRequest({ request, next, env }) {" > dist/functions/_middleware.js
+          echo "  const url = new URL(request.url);" >> dist/functions/_middleware.js
+          echo "  const pathname = url.pathname;" >> dist/functions/_middleware.js
+          echo "  const m3uUser = env.BASIC_AUTH_USERNAME;" >> dist/functions/_middleware.js
+          echo "  const m3uPass = env.BASIC_AUTH_PASSWORD;" >> dist/functions/_middleware.js
+          echo "  const rawUser = env.RAW_USER;" >> dist/functions/_middleware.js
+          echo "  const rawPass = env.RAW_PASS;" >> dist/functions/_middleware.js
+          echo "  let requireUser;" >> dist/functions/_middleware.js
+          echo "  let requirePass;" >> dist/functions/_middleware.js
+          echo "  // 只有访问zubo.m3u才使用BASIC账号，其余全部RAW账号" >> dist/functions/_middleware.js
+          echo "  if (pathname === '/zubo.m3u') {" >> dist/functions/_middleware.js
+          echo "    requireUser = m3uUser;" >> dist/functions/_middleware.js
+          echo "    requirePass = m3uPass;" >> dist/functions/_middleware.js
+          echo "  } else {" >> dist/functions/_middleware.js
+          echo "    requireUser = rawUser;" >> dist/functions/_middleware.js
+          echo "    requirePass = rawPass;" >> dist/functions/_middleware.js
+          echo "  }" >> dist/functions/_middleware.js
+          echo "  const authHeader = request.headers.get('authorization');" >> dist/functions/_middleware.js
+          echo "  if (!authHeader || !authHeader.startsWith('Basic ')) {" >> dist/functions/_middleware.js
+          echo "    return new Response('需要密码访问', {" >> dist/functions/_middleware.js
+          echo "      status: 401," >> dist/functions/_middleware.js
+          echo "      headers: {" >> dist/functions/_middleware.js
+          echo "        'WWW-Authenticate': 'Basic realm=\"请输入账号密码\"'" >> dist/functions/_middleware.js
+          echo "      }" >> dist/functions/_middleware.js
+          echo "    });" >> dist/functions/_middleware.js
+          echo "  }" >> dist/functions/_middleware.js
+          echo "  const base64Str = authHeader.split(' ')[1];" >> dist/functions/_middleware.js
+          echo "  const decoded = atob(base64Str);" >> dist/functions/_middleware.js
+          echo "  const [user, pass] = decoded.split(':');" >> dist/functions/_middleware.js
+          echo "  if (user !== requireUser || pass !== requirePass) {" >> dist/functions/_middleware.js
+          echo "    return new Response('账号密码错误', {status: 401});" >> dist/functions/_middleware.js
+          echo "  }" >> dist/functions/_middleware.js
+          echo "  return next();" >> dist/functions/_middleware.js
+          echo "}" >> dist/functions/_middleware.js
+
+          # 调试：打印dist目录结构，确认middleware位置
+          ls -R dist > /dev/null
+
+      # ====================== Cloudflare Pages部署 ======================
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v4
         continue-on-error: true
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          command: pages deploy . --project-name=zjdx
+          command: pages deploy dist --project-name=zjdx
 
-      # 文件校验恢复完成之后，再执行git add
-      - name: 更新源（文件变更才提交，无变化直接跳过）
+      # 【关键：不再提交任何文件回仓库】
+      - name: 跳过Git提交，不回传ip/logs/m3u到Github
         run: |
-          cd $GITHUB_WORKSPACE
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          
-          git reset HEAD .
-          
-          # 提交：ip + logs
-          if [[ -n $(git status --porcelain ip/ logs/) ]]; then
-            echo "✅ 源文件检测到更新，准备提交"
-            git add ip/
-            git add logs/
-            # 【重点：不git add zubo.m3u，明文不会保存到github仓库】
-            if [[ -n $(git status --porcelain) ]]; then
-              git commit -m "🤖 GitHub Actions自动更新多城市源 ${{ github.run_id }}"
-              git push
-            else
-              echo "✅ git无变更，跳过提交"
-            fi
-          else
-            echo "ℹ️ 文件无更新，跳过git提交"
-          fi
+          echo "✅ 本次策略：所有运行生成文件(ip、logs、m3u、txt)仅部署CF，不提交Github仓库"
+          echo "ℹ️ Runner执行结束后临时文件全部销毁"
