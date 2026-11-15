@@ -39,7 +39,7 @@ jobs:
       # ==========【修复：生成到ip文件夹，python脚本才能读到】==========
       - name: 临时生成上海电信IP段配置文件(来自Secret，不存入仓库)
         env:
-          SHDX_IP_CONTENT: ${{ secrets.ZJDX_IP_CONFIG }}
+          ZJDX_IP_CONTENT: ${{ secrets.ZJDX_IP_CONFIG }}
         run: |
           printf "%s" "$ZJDX_IP_CONTENT" > ip/Zhejiang_dianxin_ip_config.txt
           echo "====调试1：检查文件是否存在===="
