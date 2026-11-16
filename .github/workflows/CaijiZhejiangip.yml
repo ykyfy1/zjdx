@@ -37,7 +37,7 @@ jobs:
           mkdir -p txt logs ip template
 
       # ==========【修复：生成到ip文件夹，python脚本才能读到】==========
-      - name: 临时生成上海电信IP段配置文件(来自Secret，不存入仓库)
+      - name: 临时生成浙江电信IP段配置文件(来自Secret，不存入仓库)
         env:
           ZJDX_IP_CONTENT: ${{ secrets.ZJDX_IP_CONFIG }}
         run: |
