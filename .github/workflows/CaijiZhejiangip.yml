@@ -37,7 +37,7 @@ jobs:
           mkdir -p txt logs ip template
 
       # ==========【修复：生成到ip文件夹，python脚本才能读到】==========
-      - name: 临时生成浙江电信IP段配置文件(来自Secret，不存入仓库)
+      - name: 临时生成四川电信IP段配置文件(来自Secret，不存入仓库)
         env:
           ZJDX_IP_CONTENT: ${{ secrets.ZJDX_IP_CONFIG }}
         run: |
@@ -46,6 +46,17 @@ jobs:
           ls -la ip/Zhejiang_dianxin_ip_config.txt
           echo "====调试2：统计文件行数===="
           wc -l ip/Zhejiang_dianxin_ip_config.txt
+
+      # ========== 生成频道模板文件到 template/ 目录【新增】==========
+      - name: 临时生成四川频道模板(Secret保存，不进仓库)
+        env:
+          ZJDX_TPL_CONTENT: ${{ secrets.ZJDX_TPL_CONFIG }}
+        run: |
+          mkdir -p template
+          printf "%s" "$ZJDX_TPL_CONTENT" > template/template_Zhejiang_dianxin.txt
+          echo "====检查模板文件===="
+          ls -la template/
+          wc -l template/template_Zhejiang_dianxin.txt
 
       # ==========【清理ip目录旧good_*文件，防止残留干扰测速】==========
       - name: 清理ip目录历史good_*旧文件
@@ -117,7 +128,7 @@ jobs:
             echo "✅ 全局合并完成，zubo.txt生成成功"
           else
             echo "⚠️ 警告：新zubo.txt不存在或者是空！尝试恢复旧备份文件"
-            if [ -f "zubo_bf.txt" ] && [ -s "zubo_bf.txt" ]; then
+            if [ -f "zubo_bf.txt" ] && [ -s "$zubo_bf.txt" ]; then
               cp zubo_bf.txt zubo.txt
               echo "✅ 已恢复备份文件"
             else
