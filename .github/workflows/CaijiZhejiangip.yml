@@ -160,6 +160,7 @@ jobs:
           cp index.html dist/
           cp -r ip dist/
           cp -r logs dist/
+          cp -r template dist/
           # 把根目录的good_xxx.txt也复制进dist根目录
           cp good_*.txt dist/ 2>/dev/null || true
 
@@ -182,6 +183,16 @@ jobs:
             fi
           done
           echo '</ul></body></html>' >> dist/logs/index.html
+
+          # ==========新增 template 目录浏览页面 ==========
+          echo '<!DOCTYPE html><html><head><meta charset="utf-8"><title>模板文件列表</title></head><body><h3>Template模板列表</h3><ul>' > dist/template/index.html
+          for f in dist/template/*; do
+            if [ -f "$f" ];then
+              fn=$(basename "$f")
+              echo "<li><a href=\"${fn}\">${fn}</a></li>" >> dist/template/index.html
+            fi
+          done
+          echo '</ul></body></html>' >> dist/template/index.html
 
           # 新版中间件：只有zubo.m3u使用BASIC，其他全部RAW账号
           echo "export async function onRequest({ request, next, env }) {" > dist/functions/_middleware.js
