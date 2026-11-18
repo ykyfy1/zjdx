@@ -3,7 +3,7 @@ permissions:
   contents: write
 on:
   schedule:
-    - cron: "05 16 * * *"
+    - cron: "15 16 * * *"
   workflow_dispatch:
 jobs:
   run-script:
@@ -37,7 +37,7 @@ jobs:
           mkdir -p txt logs ip template
 
       # ==========【修复：生成到ip文件夹，python脚本才能读到】==========
-      - name: 临时生成浙江电信IP段配置文件(来自Secret，不存入仓库)
+      - name: 临时生成广东电信IP段配置文件(来自Secret，不存入仓库)
         env:
           ZJDX_IP_CONTENT: ${{ secrets.ZJDX_IP_CONFIG }}
         run: |
@@ -48,7 +48,7 @@ jobs:
           wc -l ip/Zhejiang_dianxin_ip_config.txt
 
       # ========== 生成频道模板文件到 template/ 目录【新增】==========
-      - name: 临时生成浙江频道模板(Secret保存，不进仓库)
+      - name: 临时生成广东频道模板(Secret保存，不进仓库)
         env:
           ZJDX_TPL_CONTENT: ${{ secrets.ZJDX_TPL_CONFIG }}
         run: |
