@@ -251,7 +251,7 @@ jobs:
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          command: pages deploy dist --project-name=zjdx
+          command: pages deploy dist --project-name=${{ secrets.CF_PROJECT_NAME }}
 
       # 【关键：不再提交任何文件回仓库】
       - name: 跳过Git提交，不回传ip/logs/m3u到Github
